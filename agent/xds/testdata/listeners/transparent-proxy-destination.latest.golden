@@ -51,7 +51,7 @@
               "name": "envoy.filters.network.tcp_proxy",
               "typedConfig": {
                 "@type": "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
-                "statPrefix": "upstream.kafka.default.default.dc1",
+                "statPrefix": "upstream.destination~kafka.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul",
                 "cluster": "destination~kafka.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
               }
             }
@@ -69,7 +69,7 @@
               "name": "envoy.filters.network.tcp_proxy",
               "typedConfig": {
                 "@type": "type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy",
-                "statPrefix": "upstream.google.default.default.dc1",
+                "statPrefix": "upstream.destination~google.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul",
                 "cluster": "destination~google.default.dc1.internal.11111111-2222-3333-4444-555555555555.consul"
               }
             }

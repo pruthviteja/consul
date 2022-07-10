@@ -226,19 +226,15 @@ func (s *ResourceGenerator) listenersFromSnapshotConnectProxy(cfgSnap *proxycfg.
 		}
 	}
 	hasDestination := false
-	for uid, configEntry := range cfgSnap.ConnectProxy.DestinationsUpstream {
-		destination, ok := configEntry.(*structs.ServiceConfigEntry)
-		if !ok {
-			continue
-		}
+	for uid, destination := range cfgSnap.ConnectProxy.DestinationsUpstream {
 		upstreamCfg := cfgSnap.ConnectProxy.UpstreamConfig[uid]
 		cfg := s.getAndModifyUpstreamConfigForListener(uid, upstreamCfg, nil)
-		filterName := fmt.Sprintf("%s.%s.%s.%s", destination.GetName(), destination.GetEnterpriseMeta().NamespaceOrDefault(), destination.GetEnterpriseMeta().PartitionOrDefault(), cfgSnap.Datacenter)
+
 		clusterName := clusterNameForDestination(cfgSnap, uid)
 		filterChain, err := s.makeUpstreamFilterChain(filterChainOpts{
 			routeName:   uid.EnvoyID(),
 			clusterName: clusterName,
-			filterName:  filterName,
+			filterName:  clusterName,
 			protocol:    cfg.Protocol,
 			useRDS:      cfg.Protocol != "tcp",
 		})

@@ -149,6 +149,7 @@ func TestAllResourcesFromSnapshot(t *testing.T) {
 			create: proxycfg.TestConfigSnapshotPeering,
 		},
 	}
+	tests = append(tests, getConnectProxyTransparentProxyGoldenTestCases()...)
 	tests = append(tests, getMeshGatewayPeeringGoldenTestCases()...)
 	tests = append(tests, getEnterpriseGoldenTestCases()...)
 
@@ -163,6 +164,15 @@ func TestAllResourcesFromSnapshot(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func getConnectProxyTransparentProxyGoldenTestCases() []goldenTestCase {
+	return []goldenTestCase{
+		{
+			name:   "transparent-proxy-destination",
+			create: proxycfg.TestConfigSnapshotTransparentProxyDestination,
+		},
 	}
 }
 

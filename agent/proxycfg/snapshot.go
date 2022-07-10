@@ -3,7 +3,6 @@ package proxycfg
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-hclog"
 	"sort"
 	"strings"
 
@@ -138,9 +137,10 @@ type configSnapshotConnectProxy struct {
 	// NOTE: Intentions stores a list of lists as returned by the Intentions
 	// Match RPC. So far we only use the first list as the list of matching
 	// intentions.
-	Intentions                  structs.Intentions
-	IntentionsSet               bool
-	DestinationsUpstream        map[UpstreamID]structs.ConfigEntry
+	Intentions    structs.Intentions
+	IntentionsSet bool
+
+	DestinationsUpstream        map[UpstreamID]structs.ServiceConfigEntry
 	WatchedDestinationsUpstream map[UpstreamID]context.CancelFunc
 	DestinationGateways         map[UpstreamID]structs.CheckServiceNodes
 	WatchedDestinationGateways  map[UpstreamID]context.CancelFunc
@@ -664,7 +664,6 @@ type ConfigSnapshot struct {
 
 	// ingress-gateway specific
 	IngressGateway configSnapshotIngressGateway
-	Logger         hclog.Logger
 }
 
 // Valid returns whether or not the snapshot has all required fields filled yet.
@@ -724,6 +723,9 @@ func (s *ConfigSnapshot) Clone() (*ConfigSnapshot, error) {
 		snap.ConnectProxy.WatchedGateways = nil
 		snap.ConnectProxy.WatchedDiscoveryChains = nil
 		snap.ConnectProxy.WatchedUpstreamPeerTrustBundles = nil
+		// only connect-proxy
+		snap.ConnectProxy.WatchedDestinationsUpstream = nil
+		snap.ConnectProxy.WatchedDestinationGateways = nil
 	case structs.ServiceKindTerminatingGateway:
 		snap.TerminatingGateway.WatchedServices = nil
 		snap.TerminatingGateway.WatchedIntentions = nil

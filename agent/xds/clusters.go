@@ -239,28 +239,7 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 				c.ConnectTimeout = durationpb.New(discoTarget.ConnectTimeout)
 			}
 
-			spiffeID := connect.SpiffeIDService{
-				Host:       cfgSnap.Roots.TrustDomain,
-				Partition:  uid.PartitionOrDefault(),
-				Namespace:  uid.NamespaceOrDefault(),
-				Datacenter: cfgSnap.Datacenter,
-				Service:    uid.Name,
-			}
-
-			commonTLSContext := makeCommonTLSContext(
-				cfgSnap.Leaf(),
-				cfgSnap.RootPEMs(),
-				makeTLSParametersFromProxyTLSConfig(cfgSnap.MeshConfigTLSOutgoing()),
-			)
-			err := injectSANMatcher(commonTLSContext, spiffeID.URI().String())
-			if err != nil {
-				return nil, fmt.Errorf("failed to inject SAN matcher rules for cluster %q: %v", sni, err)
-			}
-			tlsContext := envoy_tls_v3.UpstreamTlsContext{
-				CommonTlsContext: commonTLSContext,
-				Sni:              sni,
-			}
-			transportSocket, err := makeUpstreamTLSTransportSocket(&tlsContext)
+			transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, sni)
 			if err != nil {
 				return nil, err
 			}
@@ -269,17 +248,13 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 		}
 	}
 
-	for uid, entry := range cfgSnap.ConnectProxy.DestinationsUpstream {
-		_, ok := entry.(*structs.ServiceConfigEntry)
-		if !ok {
-			continue
-		}
+	for uid := range cfgSnap.ConnectProxy.DestinationsUpstream {
 
 		sni := connect.ServiceSNI(
 			uid.Name, "", uid.NamespaceOrDefault(), uid.PartitionOrDefault(), cfgSnap.Datacenter, cfgSnap.Roots.TrustDomain)
 		name := clusterNameForDestination(cfgSnap, uid)
 
-		cluster := &envoy_cluster_v3.Cluster{
+		c := envoy_cluster_v3.Cluster{
 			Name:           name,
 			AltStatName:    name,
 			ConnectTimeout: durationpb.New(5 * time.Second),
@@ -302,36 +277,44 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 			OutlierDetection: &envoy_cluster_v3.OutlierDetection{},
 		}
 
-		spiffeID := connect.SpiffeIDService{
-			Host:       cfgSnap.Roots.TrustDomain,
-			Partition:  uid.PartitionOrDefault(),
-			Namespace:  uid.NamespaceOrDefault(),
-			Datacenter: cfgSnap.Datacenter,
-			Service:    uid.Name,
-		}
-
-		commonTLSContext := makeCommonTLSContext(
-			cfgSnap.Leaf(),
-			cfgSnap.RootPEMs(),
-			makeTLSParametersFromProxyTLSConfig(cfgSnap.MeshConfigTLSOutgoing()),
-		)
-		err := injectSANMatcher(commonTLSContext, spiffeID.URI().String())
-		if err != nil {
-			return nil, fmt.Errorf("failed to inject SAN matcher rules for cluster %q: %v", sni, err)
-		}
-		tlsContext := envoy_tls_v3.UpstreamTlsContext{
-			CommonTlsContext: commonTLSContext,
-			Sni:              sni,
-		}
-		transportSocket, err := makeUpstreamTLSTransportSocket(&tlsContext)
+		transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, sni)
 		if err != nil {
 			return nil, err
 		}
-		cluster.TransportSocket = transportSocket
-		clusters = append(clusters, cluster)
+		c.TransportSocket = transportSocket
+		clusters = append(clusters, &c)
 	}
 
 	return clusters, nil
+}
+
+func makeMTLSTransportSocket(cfgSnap *proxycfg.ConfigSnapshot, uid proxycfg.UpstreamID, sni string) (*envoy_core_v3.TransportSocket, error) {
+	spiffeID := connect.SpiffeIDService{
+		Host:       cfgSnap.Roots.TrustDomain,
+		Partition:  uid.PartitionOrDefault(),
+		Namespace:  uid.NamespaceOrDefault(),
+		Datacenter: cfgSnap.Datacenter,
+		Service:    uid.Name,
+	}
+
+	commonTLSContext := makeCommonTLSContext(
+		cfgSnap.Leaf(),
+		cfgSnap.RootPEMs(),
+		makeTLSParametersFromProxyTLSConfig(cfgSnap.MeshConfigTLSOutgoing()),
+	)
+	err := injectSANMatcher(commonTLSContext, spiffeID.URI().String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to inject SAN matcher rules for cluster %q: %v", sni, err)
+	}
+	tlsContext := envoy_tls_v3.UpstreamTlsContext{
+		CommonTlsContext: commonTLSContext,
+		Sni:              sni,
+	}
+	transportSocket, err := makeUpstreamTLSTransportSocket(&tlsContext)
+	if err != nil {
+		return nil, err
+	}
+	return transportSocket, nil
 }
 
 func clusterNameForDestination(cfgSnap *proxycfg.ConfigSnapshot, uid proxycfg.UpstreamID) string {
@@ -1438,20 +1421,13 @@ func (s *ResourceGenerator) makeTerminatingHostnameCluster(snap *proxycfg.Config
 	rate := 10 * time.Second
 	cluster.DnsRefreshRate = durationpb.New(rate)
 
+	address := makeAddress(opts.addressEndpoint.Address, opts.addressEndpoint.Port)
+
 	endpoints := []*envoy_endpoint_v3.LbEndpoint{
 		{
 			HostIdentifier: &envoy_endpoint_v3.LbEndpoint_Endpoint{
 				Endpoint: &envoy_endpoint_v3.Endpoint{
-					Address: &envoy_core_v3.Address{
-						Address: &envoy_core_v3.Address_SocketAddress{
-							SocketAddress: &envoy_core_v3.SocketAddress{
-								Address: opts.addressEndpoint.Address,
-								PortSpecifier: &envoy_core_v3.SocketAddress_PortValue{
-									PortValue: uint32(opts.addressEndpoint.Port),
-								},
-							},
-						},
-					},
+					Address: address,
 				},
 			},
 		},
@@ -1459,11 +1435,9 @@ func (s *ResourceGenerator) makeTerminatingHostnameCluster(snap *proxycfg.Config
 
 	cluster.LoadAssignment = &envoy_endpoint_v3.ClusterLoadAssignment{
 		ClusterName: cluster.Name,
-		Endpoints: []*envoy_endpoint_v3.LocalityLbEndpoints{
-			{
-				LbEndpoints: endpoints,
-			},
-		},
+		Endpoints: []*envoy_endpoint_v3.LocalityLbEndpoints{{
+			LbEndpoints: endpoints,
+		}},
 	}
 
 	return cluster

@@ -2489,7 +2489,7 @@ func TestState_WatchesAndUpdates(t *testing.T) {
 							_, ok := snap.ConnectProxy.DestinationGateways[k]
 							require.True(t, ok)
 						}
-						require.Equal(t, &structs.ServiceConfigEntry{Name: "db", Destination: &structs.DestinationConfig{}}, snap.ConnectProxy.DestinationsUpstream[dbUID])
+						require.Equal(t, structs.ServiceConfigEntry{Name: "db", Destination: &structs.DestinationConfig{}}, snap.ConnectProxy.DestinationsUpstream[dbUID])
 					},
 				},
 			},
