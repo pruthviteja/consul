@@ -12,7 +12,6 @@ export default class PeerAbility extends BaseAbility {
     return ![
       'DELETING',
       'TERMINATED',
-      'UNDEFINED'
     ].includes(this.item.State);
   }
 
