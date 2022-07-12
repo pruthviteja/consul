@@ -4245,6 +4245,7 @@ func (a *Agent) proxyDataSources() proxycfg.DataSources {
 		sources.ConfigEntry = proxycfgglue.ServerConfigEntry(deps)
 		sources.ConfigEntryList = proxycfgglue.ServerConfigEntryList(deps)
 		sources.CompiledDiscoveryChain = proxycfgglue.ServerCompiledDiscoveryChain(deps, proxycfgglue.CacheCompiledDiscoveryChain(a.cache))
+		sources.FederationStateListMeshGateways = proxycfgglue.ServerFederationStateListMeshGateways(deps)
 		sources.GatewayServices = proxycfgglue.ServerGatewayServices(deps)
 		sources.Health = proxycfgglue.ServerHealth(deps, proxycfgglue.ClientHealth(a.rpcClientHealth))
 		sources.Intentions = proxycfgglue.ServerIntentions(deps)
